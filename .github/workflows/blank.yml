@@ -1,0 +1,50 @@
+name: Virtual PC Online
+
+on:
+  workflow_dispatch:
+    inputs:
+      password:
+        description: 'Defina uma senha para o usuário (ou deixe padrão)'
+        required: true
+        default: '123456'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # Mantém a máquina ligada por até 6 horas
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configurar Senha do Usuário
+        run: |
+          echo "runner:${{ github.event.inputs.password }}" | sudo chpasswd
+
+      - name: Instalar Servidor de Área de Trabalho e Ferramentas
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies tightvncserver wget curl
+
+      - name: Instalar o Ngrok
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install -y ngrok
+
+      - name: Iniciar Servidor VNC
+        run: |
+          vncserver -geometry 1280x720 -depth 24 &
+
+      - name: Autenticar Ngrok
+        run: |
+          ngrok config add-authtoken ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Conectar Ngrok na porta VNC (TCP)
+        run: |
+          ngrok tcp 5901 &
+
+      - name: Manter a Máquina Ativa
+        run: |
+          echo "PC Virtual pronto! Use um cliente VNC com a url do Ngrok para conectar."
+          sleep infinity
